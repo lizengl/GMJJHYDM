@@ -48,12 +48,12 @@ st.markdown("""
     .stSpinner > div { border-top-color: #3b82f6 !important; }
 
     /* 红色清除按钮 */
-    .clear-btn-container button {
+    [data-testid="stSidebar"] button[kind="primary"] {
         background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
         border: none !important; color: #fff !important; font-weight: 600 !important;
         border-radius: 8px !important; transition: all 0.2s !important;
     }
-    .clear-btn-container button:hover {
+    [data-testid="stSidebar"] button[kind="primary"]:hover {
         background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
         transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.4) !important;
     }
@@ -82,13 +82,11 @@ with st.sidebar:
     st.caption("例如：「我们公司主要做新能源汽车动力电池的研发、生产和销售」")
 
     st.divider()
-    st.markdown('<div class="clear-btn-container">', unsafe_allow_html=True)
-    if st.button("清空历史记录", use_container_width=True):
+    if st.button("清空历史记录", type="primary", use_container_width=True):
         st.session_state["message"] = [{"role": "assistant", "content": WELCOME_MSG}]
         st.session_state["last_company_desc"] = None
         get_history(config.session_config["configurable"]["session_id"]).clear()
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ── 主界面 ────────────────────────────────────────────────
 st.markdown("""
