@@ -1,14 +1,20 @@
 [project]
 name = "p4rag"
 version = "0.1.0"
-description = "Add your description here"
+description = "基于LangChain + Streamlit + Chroma的RAG智能问答系统，支持TXT和Excel知识库上传，使用通义千问Qwen3-Max + DashScope Embeddings"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib>=3.10.9",
+    "chromadb>=1.5.0",
+    "dashscope>=1.25.0",
+    "langchain-core>=1.4.0",
+    "langchain-community>=0.4.0",
+    "langchain-chroma>=1.1.0",
+    "langchain-text-splitters>=1.1.0",
+    "matplotlib>=3.10.0",
     "openpyxl>=3.1.5",
-    "pandas>=2.3.3",
-    "seaborn>=0.13.2",
+    "pandas>=2.3.0",
+    "seaborn>=0.13.0",
     "streamlit>=1.57.0",
 ]
 
