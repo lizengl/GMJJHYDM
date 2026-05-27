@@ -1,7 +1,7 @@
 """
-基于Streamlit完成web网页上传服务
+知识库上传服务
 
-Streamlit：当WEB页面元素发生变化，则代码重新执行一遍
+支持 TXT 和 Excel 文件上传至向量数据库。
 """
 import io
 import time
@@ -18,35 +18,62 @@ def excel_to_text(file_bytes):
         parts.append(df.to_string(index=False))
     return "\n".join(parts)
 
-#添加网页标题
+st.set_page_config(page_title="知识库更新", page_icon="📚")
 st.title("知识库更新服务")
 
-#file_uploader
-uploader_file = st.file_uploader(
-    "请上传TXT或Excel文件",
-    type=['txt', 'xlsx'],
-    accept_multiple_files=False,
-)
-
-# session_state就是一个字典
+# 初始化服务
 if "service" not in st.session_state:
     st.session_state["service"] = KnowledgeBaseService()
+
+# 文件上传
+uploader_file = st.file_uploader(
+    "请上传 TXT 或 Excel 文件",
+    type=["txt", "xlsx"],
+    accept_multiple_files=False,
+)
 
 if uploader_file is not None:
     file_name = uploader_file.name
     file_type = uploader_file.type
     file_size = uploader_file.size / 1024
 
-    st.subheader(f"文件名：{file_name}")
-    st.subheader(f"格式：{file_type} | 大小：{file_size:.2f} KB")
+    st.divider()
 
-    # 根据文件类型读取内容
-    if file_name.endswith('.xlsx'):
-        text = excel_to_text(uploader_file.getvalue())
+    col1, col2, col3 = st.columns(3)
+    col1.metric("文件名", file_name)
+    col2.metric("格式", file_type or "未知")
+    col3.metric("大小", f"{file_size:.1f} KB")
+
+    # 解析文件内容
+    if "pending_text" not in st.session_state or st.session_state.get("pending_filename") != file_name:
+        if file_name.endswith(".xlsx"):
+            text = excel_to_text(uploader_file.getvalue())
+        else:
+            text = uploader_file.getvalue().decode("utf-8")
+        st.session_state["pending_text"] = text
+        st.session_state["pending_filename"] = file_name
+        st.session_state["upload_done"] = False
+
+    # 显示内容预览（前500字）
+    preview_text = st.session_state["pending_text"]
+    with st.expander("内容预览", expanded=False):
+        st.text(preview_text[:500] + ("..." if len(preview_text) > 500 else ""))
+
+    # 确认上传按钮
+    if not st.session_state.get("upload_done", False):
+        if st.button("确认上传", type="primary"):
+            with st.spinner("正在载入知识库..."):
+                time.sleep(0.5)
+                result = st.session_state["service"].upload_by_str(
+                    st.session_state["pending_text"], file_name
+                )
+                st.session_state["upload_done"] = True
+                st.session_state["upload_result"] = result
+                st.rerun()
     else:
-        text = uploader_file.getvalue().decode("utf-8")
-
-    with st.spinner("载入知识库中。。。"):
-        time.sleep(1)
-        result = st.session_state["service"].upload_by_str(text, file_name)
-        st.write(result)
+        st.success(st.session_state.get("upload_result", "上传完成"))
+        if st.button("上传另一个文件"):
+            st.session_state["pending_text"] = None
+            st.session_state["pending_filename"] = None
+            st.session_state["upload_done"] = False
+            st.rerun()
