@@ -35,17 +35,12 @@ def _is_followup(input_text: str) -> bool:
     return False
 
 
-class RagService(object):
-    def __init__(self):
-        _check_api_key()
+SYSTEM_PROMPT = """你是国民经济行业分类专家。
 
-        self.vector_service = VectorStoreService(
-            embedding=DashScopeEmbeddings(model=config.embedding_model_name)
-        )
-
-        self.prompt_template = ChatPromptTemplate.from_messages(
-            [
-                ("system", """你是国民经济行业分类专家。
+回答要求：
+- 直接输出最终答案，严禁输出思考过程、推理过程、自我对话。
+- 回答简洁，不超过100字。
+- 严格按照指定格式输出，不要添加额外解释。
 
 核心任务：根据用户的企业描述，匹配最合适的行业类别并给出代码。
 
@@ -58,18 +53,36 @@ class RagService(object):
 2. 如果参考资料中有多个候选，选择描述最接近的一个
 3. 如果参考资料中没有明显匹配的行业，选择最接近的并说明不确定性
 
-参考资料:{context}"""),
-                ("system", """请按以下格式回答：
-行业代码：<填写代码>
-行业名称：<填写名称>
-判断依据：<简要说明>"""),
+参考资料:{context}"""
+
+FORMAT_PROMPT = """请严格按以下格式回答（三行，不要多也不要少）：
+行业代码：<代码>
+行业名称：<名称>
+判断依据：<一句话简要说明>"""
+
+
+class RagService(object):
+    def __init__(self):
+        _check_api_key()
+
+        self.vector_service = VectorStoreService(
+            embedding=DashScopeEmbeddings(model=config.embedding_model_name)
+        )
+
+        self.prompt_template = ChatPromptTemplate.from_messages(
+            [
+                ("system", SYSTEM_PROMPT),
+                ("system", FORMAT_PROMPT),
                 ("system", "对话历史："),
                 MessagesPlaceholder("history"),
                 ("user", "{input}")
             ]
         )
 
-        self.chat_model = ChatTongyi(model=config.chat_model_name)
+        self.chat_model = ChatTongyi(
+            model=config.chat_model_name,
+            model_kwargs={"enable_thinking": False},
+        )
 
         self.chain = self.__get_chain()
 
