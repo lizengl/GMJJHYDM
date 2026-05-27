@@ -1,3 +1,5 @@
+import os
+import sys
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableWithMessageHistory, RunnableLambda
@@ -9,8 +11,20 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.chat_models.tongyi import ChatTongyi
 
 
+def _check_api_key():
+    """启动前检查 DashScope API Key 是否已配置"""
+    if "DASHSCOPE_API_KEY" not in os.environ:
+        sys.exit(
+            "\n 未检测到 DASHSCOPE_API_KEY 环境变量。\n"
+            " 本地运行: export DASHSCOPE_API_KEY='your-key'\n"
+            " Streamlit Cloud: 在 Settings -> Secrets 中添加:\n"
+            '   DASHSCOPE_API_KEY = "your-key"\n'
+        )
+
+
 class RagService(object):
     def __init__(self):
+        _check_api_key()
 
         self.vector_service = VectorStoreService(
             embedding=DashScopeEmbeddings(model=config.embedding_model_name)
