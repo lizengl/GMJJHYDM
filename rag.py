@@ -21,17 +21,15 @@ def _check_api_key():
         )
 
 
-# 追问关键词，用于检测用户是否在追问而非首次提问
-_FOLLOWUP_KEYWORDS = {"我们公司", "我们企业", "刚才", "之前", "前面", "代码", "再来", "确认",
-                      "是什么", "查一下", "帮我看看", "你刚才", "你说", "那个", "哪个"}
+_FOLLOWUP_KEYWORDS = {
+    "我们公司", "我们企业", "刚才", "之前", "前面", "代码", "再来", "确认",
+    "是什么", "查一下", "帮我看看", "你刚才", "你说", "那个", "哪个",
+}
 
 def _is_followup(input_text: str) -> bool:
-    """判断是否为追问（而非首次企业描述）"""
     text = input_text.strip()
-    # 短问题 + 包含追问词
     if len(text) <= 15 and any(kw in text for kw in _FOLLOWUP_KEYWORDS):
         return True
-    # 明确追问模式
     if text.startswith(("我们", "刚才", "之前", "那个", "你")):
         return True
     return False
@@ -47,24 +45,24 @@ class RagService(object):
 
         self.prompt_template = ChatPromptTemplate.from_messages(
             [
-                ("system",
-                 "你是国民经济行业分类专家。\n\n"
-                 "核心任务：根据用户的企业描述，匹配最合适的行业类别并给出代码。\n\n"
-                 "追问处理规则（非常重要）：\n"
-                 "- 如果用户的问题是追问（如"我们公司代码是多少"、"刚才那个行业"），"
-                 "说明用户之前已经描述过企业，请直接从对话历史中查找之前给你的结论和代码，"
-                 "直接复述即可，不要重新匹配。\n"
-                 "- 只有在用户首次描述企业或提供新的企业信息时，才需要重新匹配行业。\n\n"
-                 "匹配规则：\n"
-                 "1. 优先匹配主营业务，忽略次要或附带业务\n"
-                 "2. 如果参考资料中有多个候选，选择描述最接近的一个\n"
-                 "3. 如果参考资料中没有明显匹配的行业，选择最接近的并说明不确定性\n\n"
-                 "参考资料:{context}"),
-                ("system",
-                 "请按以下格式回答：\n"
-                 "行业代码：<填写代码>\n"
-                 "行业名称：<填写名称>\n"
-                 "判断依据：<简要说明>"),
+                ("system", """你是国民经济行业分类专家。
+
+核心任务：根据用户的企业描述，匹配最合适的行业类别并给出代码。
+
+追问处理规则（非常重要）：
+- 如果用户的问题是追问（如"我们公司代码是多少"、"刚才那个行业"），说明用户之前已经描述过企业，请直接从对话历史中查找之前给你的结论和代码，直接复述即可，不要重新匹配。
+- 只有在用户首次描述企业或提供新的企业信息时，才需要重新匹配行业。
+
+匹配规则：
+1. 优先匹配主营业务，忽略次要或附带业务
+2. 如果参考资料中有多个候选，选择描述最接近的一个
+3. 如果参考资料中没有明显匹配的行业，选择最接近的并说明不确定性
+
+参考资料:{context}"""),
+                ("system", """请按以下格式回答：
+行业代码：<填写代码>
+行业名称：<填写名称>
+判断依据：<简要说明>"""),
                 ("system", "对话历史："),
                 MessagesPlaceholder("history"),
                 ("user", "{input}")
@@ -81,17 +79,14 @@ class RagService(object):
         def format_document(docs: list[Document]):
             if not docs:
                 return "无相关参考资料"
-
             formatted_str = ""
             for doc in docs:
                 formatted_str += f"文档片段：{doc.page_content}\n文档元数据：{doc.metadata}\n\n"
-
             return formatted_str
 
         def format_for_retriever(value: dict) -> str:
             input_text = value["input"]
             if _is_followup(input_text):
-                # 追问时在检索词前加标注，帮助 retriever 理解这是追问
                 return f"用户追问：{input_text}"
             return input_text
 
