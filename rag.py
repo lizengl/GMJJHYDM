@@ -21,12 +21,13 @@ def _check_api_key():
         )
 
 
+# 追问关键词
 _FOLLOWUP_KEYWORDS = {
     "我们公司", "我们企业", "刚才", "之前", "前面", "代码", "再来", "确认",
     "是什么", "查一下", "帮我看看", "你刚才", "你说", "那个", "哪个",
 }
 
-def _is_followup(input_text: str) -> bool:
+def is_followup(input_text: str) -> bool:
     text = input_text.strip()
     if len(text) <= 15 and any(kw in text for kw in _FOLLOWUP_KEYWORDS):
         return True
@@ -43,10 +44,7 @@ SYSTEM_PROMPT = """你是国民经济行业分类专家。
 - 严格按照指定格式输出，不要添加额外解释。
 
 核心任务：根据用户的企业描述，匹配最合适的行业类别并给出代码。
-
-追问处理规则（非常重要）：
-- 如果用户的问题是追问（如"我们公司代码是多少"、"刚才那个行业"），说明用户之前已经描述过企业，请直接从对话历史中查找之前给你的结论和代码，直接复述即可，不要重新匹配。
-- 只有在用户首次描述企业或提供新的企业信息时，才需要重新匹配行业。
+每次回答都必须基于参考资料进行匹配验证，不要仅凭记忆复述。
 
 匹配规则：
 1. 优先匹配主营业务，忽略次要或附带业务
@@ -98,10 +96,10 @@ class RagService(object):
             return formatted_str
 
         def format_for_retriever(value: dict) -> str:
-            input_text = value["input"]
-            if _is_followup(input_text):
-                return f"用户追问：{input_text}"
-            return input_text
+            # 如果调用方传入了专用检索词（用于追问场景），优先使用
+            if "retrieval_query" in value:
+                return value["retrieval_query"]
+            return value["input"]
 
         def format_for_prompt_template(value):
             new_value = {}
