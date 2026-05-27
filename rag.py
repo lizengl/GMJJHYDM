@@ -12,7 +12,6 @@ from langchain_community.chat_models.tongyi import ChatTongyi
 
 
 def _check_api_key():
-    """启动前检查 DashScope API Key 是否已配置"""
     if "DASHSCOPE_API_KEY" not in os.environ:
         sys.exit(
             "\n 未检测到 DASHSCOPE_API_KEY 环境变量。\n"
@@ -20,6 +19,22 @@ def _check_api_key():
             " Streamlit Cloud: 在 Settings -> Secrets 中添加:\n"
             '   DASHSCOPE_API_KEY = "your-key"\n'
         )
+
+
+# 追问关键词，用于检测用户是否在追问而非首次提问
+_FOLLOWUP_KEYWORDS = {"我们公司", "我们企业", "刚才", "之前", "前面", "代码", "再来", "确认",
+                      "是什么", "查一下", "帮我看看", "你刚才", "你说", "那个", "哪个"}
+
+def _is_followup(input_text: str) -> bool:
+    """判断是否为追问（而非首次企业描述）"""
+    text = input_text.strip()
+    # 短问题 + 包含追问词
+    if len(text) <= 15 and any(kw in text for kw in _FOLLOWUP_KEYWORDS):
+        return True
+    # 明确追问模式
+    if text.startswith(("我们", "刚才", "之前", "那个", "你")):
+        return True
+    return False
 
 
 class RagService(object):
@@ -32,20 +47,27 @@ class RagService(object):
 
         self.prompt_template = ChatPromptTemplate.from_messages(
             [
-                ("system", "你是一个国民经济行业分类专家。你的任务是根据参考资料中的行业信息，"
-                 "判断用户描述的企业经营活动最匹配哪个行业类别。\n\n"
-                 "规则：\n"
+                ("system",
+                 "你是国民经济行业分类专家。\n\n"
+                 "核心任务：根据用户的企业描述，匹配最合适的行业类别并给出代码。\n\n"
+                 "追问处理规则（非常重要）：\n"
+                 "- 如果用户的问题是追问（如"我们公司代码是多少"、"刚才那个行业"），"
+                 "说明用户之前已经描述过企业，请直接从对话历史中查找之前给你的结论和代码，"
+                 "直接复述即可，不要重新匹配。\n"
+                 "- 只有在用户首次描述企业或提供新的企业信息时，才需要重新匹配行业。\n\n"
+                 "匹配规则：\n"
                  "1. 优先匹配主营业务，忽略次要或附带业务\n"
                  "2. 如果参考资料中有多个候选，选择描述最接近的一个\n"
                  "3. 如果参考资料中没有明显匹配的行业，选择最接近的并说明不确定性\n\n"
                  "参考资料:{context}"),
-                ("system", "请按以下格式回答：\n"
+                ("system",
+                 "请按以下格式回答：\n"
                  "行业代码：<填写代码>\n"
                  "行业名称：<填写名称>\n"
-                 "判断依据：<简要说明为什么选择这个行业>"),
-                ("system", "对话历史记录如下："),
+                 "判断依据：<简要说明>"),
+                ("system", "对话历史："),
                 MessagesPlaceholder("history"),
-                ("user", "用户的企业描述：{input}")
+                ("user", "{input}")
             ]
         )
 
@@ -54,7 +76,6 @@ class RagService(object):
         self.chain = self.__get_chain()
 
     def __get_chain(self):
-        """获取最终的执行链"""
         retriever = self.vector_service.get_retriever()
 
         def format_document(docs: list[Document]):
@@ -68,10 +89,13 @@ class RagService(object):
             return formatted_str
 
         def format_for_retriever(value: dict) -> str:
-            return value["input"]
+            input_text = value["input"]
+            if _is_followup(input_text):
+                # 追问时在检索词前加标注，帮助 retriever 理解这是追问
+                return f"用户追问：{input_text}"
+            return input_text
 
         def format_for_prompt_template(value):
-            # {input, context, history}
             new_value = {}
             new_value["input"] = value["input"]["input"]
             new_value["context"] = value["context"]
